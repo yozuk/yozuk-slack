@@ -41,3 +41,8 @@ pub struct Message {
     pub channel_type: String,
     pub ts: String,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Identity {
+    pub user_id: String,
+}

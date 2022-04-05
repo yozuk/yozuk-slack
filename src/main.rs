@@ -23,9 +23,16 @@ async fn main() -> Result<()> {
         .default_headers(headers)
         .build()?;
 
+    let identity = client
+        .post("https://slack.com/api/auth.test")
+        .send()
+        .await?
+        .json::<Identity>()
+        .await?;
+
     let route = warp::any()
         .and(warp::body::json())
-        .and_then(move |event| handle_message(event, client.clone()));
+        .and_then(move |event| handle_message(event, client.clone(), identity.clone()));
 
     warp::serve(route).run(([127, 0, 0, 1], 8080)).await;
 
@@ -35,6 +42,7 @@ async fn main() -> Result<()> {
 async fn handle_message(
     event: Event,
     client: reqwest::Client,
+    identity: Identity,
 ) -> Result<warp::reply::Json, Infallible> {
     match event {
         Event::EventCallback(cb) => match cb.event {
@@ -51,7 +59,21 @@ async fn handle_message(
                     .await
                     .unwrap();
             }
-            MessageEvent::Message(_msg) => {}
+            MessageEvent::Message(msg) => {
+                if msg.user != identity.user_id {
+                    client
+                        .post("https://slack.com/api/chat.postMessage")
+                        .json(&PostMessage {
+                            channel: msg.channel,
+                            text: Some("Hello DM".into()),
+                            thread_ts: Some(msg.ts),
+                            reply_broadcast: true,
+                        })
+                        .send()
+                        .await
+                        .unwrap();
+                }
+            }
         },
         Event::UrlVerification(event) => return Ok(handle_url_verification(event)),
     }
