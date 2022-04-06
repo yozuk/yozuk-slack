@@ -50,29 +50,13 @@ async fn handle_message(
     match event {
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
-                client
-                    .post(API_URL_POST_MESSAGE)
-                    .json(&PostMessage {
-                        channel: msg.channel,
-                        text: Some("Hello".into()),
-                        thread_ts: Some(msg.ts),
-                        reply_broadcast: true,
-                    })
-                    .send()
+                handle_request(msg.text, msg.channel, client, identity)
                     .await
                     .unwrap();
             }
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
-                    client
-                        .post(API_URL_POST_MESSAGE)
-                        .json(&PostMessage {
-                            channel: msg.channel,
-                            text: Some("Hello DM".into()),
-                            thread_ts: Some(msg.ts),
-                            reply_broadcast: true,
-                        })
-                        .send()
+                    handle_request(msg.text, msg.channel, client, identity)
                         .await
                         .unwrap();
                 }
@@ -81,6 +65,26 @@ async fn handle_message(
         Event::UrlVerification(event) => return Ok(handle_url_verification(event)),
     }
     Ok(warp::reply::json(&"ok".to_string()))
+}
+
+async fn handle_request(
+    text: String,
+    channel: String,
+    client: reqwest::Client,
+    identity: Identity,
+) -> Result<()> {
+    let mention = format!("<@{}>", identity.user_id);
+    let text = text.replace(&mention, "");
+    client
+        .post(API_URL_POST_MESSAGE)
+        .json(&PostMessage {
+            channel,
+            text: Some(text),
+            ..Default::default()
+        })
+        .send()
+        .await?;
+    Ok(())
 }
 
 fn handle_url_verification(verification: UrlVerification) -> warp::reply::Json {
