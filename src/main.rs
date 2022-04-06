@@ -2,7 +2,9 @@ use anyhow::Result;
 use reqwest::header;
 use std::convert::Infallible;
 use std::env;
+use std::sync::Arc;
 use warp::Filter;
+use yozuk::{ModelSet, Yozuk, YozukError};
 
 mod event;
 mod message;
@@ -26,6 +28,9 @@ async fn main() -> Result<()> {
         .default_headers(headers)
         .build()?;
 
+    let model = ModelSet::from_data(yozuk_bundle::MODEL_DATA).unwrap();
+    let yozuk = Arc::new(Yozuk::builder().build(model));
+
     let identity = client
         .post(API_URL_AUTH_TEST)
         .send()
@@ -33,9 +38,9 @@ async fn main() -> Result<()> {
         .json::<Identity>()
         .await?;
 
-    let route = warp::any()
-        .and(warp::body::json())
-        .and_then(move |event| handle_message(event, client.clone(), identity.clone()));
+    let route = warp::any().and(warp::body::json()).and_then(move |event| {
+        handle_message(event, yozuk.clone(), client.clone(), identity.clone())
+    });
 
     warp::serve(route).run(([127, 0, 0, 1], 8080)).await;
 
@@ -44,19 +49,20 @@ async fn main() -> Result<()> {
 
 async fn handle_message(
     event: Event,
+    zuk: Arc<Yozuk>,
     client: reqwest::Client,
     identity: Identity,
 ) -> Result<warp::reply::Json, Infallible> {
     match event {
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
-                handle_request(msg.text, msg.channel, client, identity)
+                handle_request(msg.text, msg.channel, zuk, client, identity)
                     .await
                     .unwrap();
             }
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
-                    handle_request(msg.text, msg.channel, client, identity)
+                    handle_request(msg.text, msg.channel, zuk, client, identity)
                         .await
                         .unwrap();
                 }
@@ -70,20 +76,38 @@ async fn handle_message(
 async fn handle_request(
     text: String,
     channel: String,
+    zuk: Arc<Yozuk>,
     client: reqwest::Client,
     identity: Identity,
 ) -> Result<()> {
     let mention = format!("<@{}>", identity.user_id);
     let text = text.replace(&mention, "");
-    client
-        .post(API_URL_POST_MESSAGE)
-        .json(&PostMessage {
-            channel,
-            text: Some(text),
-            ..Default::default()
-        })
-        .send()
-        .await?;
+
+    let tokens = Yozuk::parse_tokens(&text);
+    let result = zuk
+        .get_commands(&tokens, &[])
+        .and_then(|commands| zuk.run_commands(commands, &mut []));
+
+    let output = match result {
+        Ok(output) => output,
+        Err(YozukError::UnintelligibleRequest { .. }) => {
+            return Ok(());
+        }
+        Err(YozukError::CommandError { mut errors }) => errors.pop().unwrap(),
+    };
+
+    for section in output.sections {
+        client
+            .post(API_URL_POST_MESSAGE)
+            .json(&PostMessage {
+                channel: channel.clone(),
+                text: Some(section.as_utf8().into()),
+                ..Default::default()
+            })
+            .send()
+            .await?;
+    }
+
     Ok(())
 }
 
