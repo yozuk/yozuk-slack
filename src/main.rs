@@ -10,6 +10,9 @@ mod message;
 use event::*;
 use message::*;
 
+const API_URL_AUTH_TEST: &str = "https://slack.com/api/auth.test";
+const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut headers = header::HeaderMap::new();
@@ -24,7 +27,7 @@ async fn main() -> Result<()> {
         .build()?;
 
     let identity = client
-        .post("https://slack.com/api/auth.test")
+        .post(API_URL_AUTH_TEST)
         .send()
         .await?
         .json::<Identity>()
@@ -48,7 +51,7 @@ async fn handle_message(
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
                 client
-                    .post("https://slack.com/api/chat.postMessage")
+                    .post(API_URL_POST_MESSAGE)
                     .json(&PostMessage {
                         channel: msg.channel,
                         text: Some("Hello".into()),
@@ -62,7 +65,7 @@ async fn handle_message(
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
                     client
-                        .post("https://slack.com/api/chat.postMessage")
+                        .post(API_URL_POST_MESSAGE)
                         .json(&PostMessage {
                             channel: msg.channel,
                             text: Some("Hello DM".into()),
