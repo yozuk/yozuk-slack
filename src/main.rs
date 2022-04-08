@@ -6,6 +6,7 @@ use std::net::SocketAddrV4;
 use std::sync::Arc;
 use warp::Filter;
 use yozuk::{ModelSet, Yozuk, YozukError};
+use yozuk_sdk::prelude::*;
 
 mod args;
 mod block;
@@ -129,13 +130,28 @@ async fn handle_request(
     };
 
     for section in output.sections {
-        client
-            .post(API_URL_POST_MESSAGE)
-            .json(&PostMessage {
+        let massage = if section.kind == SectionKind::Comment {
+            PostMessage {
                 channel: channel.clone(),
                 text: Some(section.as_utf8().into()),
                 ..Default::default()
-            })
+            }
+        } else {
+            PostMessage {
+                channel: channel.clone(),
+                blocks: Some(vec![Block {
+                    ty: "section".into(),
+                    text: Some(Text {
+                        ty: "mrkdwn".into(),
+                        text: format!("```\n{}\n```", section.as_utf8()),
+                    }),
+                }]),
+                ..Default::default()
+            }
+        };
+        client
+            .post(API_URL_POST_MESSAGE)
+            .json(&massage)
             .send()
             .await?;
     }
