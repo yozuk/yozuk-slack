@@ -118,6 +118,6 @@ async fn handle_request(
 
 fn handle_url_verification(verification: UrlVerification) -> warp::reply::Json {
     warp::reply::json(&UrlVerificationReply {
-        challenge: verification.challenge.clone(),
+        challenge: verification.challenge,
     })
 }
