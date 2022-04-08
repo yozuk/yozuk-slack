@@ -18,6 +18,7 @@ pub struct UrlVerification {
 pub enum MessageEvent {
     AppMention(AppMention),
     Message(Message),
+    AppHomeOpened(AppHomeOpened),
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,4 +46,9 @@ pub struct Message {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Identity {
     pub user_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AppHomeOpened {
+    pub user: String,
 }

@@ -8,15 +8,18 @@ use warp::Filter;
 use yozuk::{ModelSet, Yozuk, YozukError};
 
 mod args;
+mod block;
 mod event;
 mod message;
 
 use args::*;
+use block::*;
 use event::*;
 use message::*;
 
 const API_URL_AUTH_TEST: &str = "https://slack.com/api/auth.test";
 const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
+const API_URL_VIEWS_PUBLISH: &str = "https://slack.com/api/views.publish";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -72,10 +75,34 @@ async fn handle_message(
                         .unwrap();
                 }
             }
+            MessageEvent::AppHomeOpened(event) => {
+                publish_home(client, event.user).await.unwrap();
+            }
         },
         Event::UrlVerification(event) => return Ok(handle_url_verification(event)),
     }
     Ok(warp::reply::json(&"ok".to_string()))
+}
+
+async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
+    client
+        .post(API_URL_VIEWS_PUBLISH)
+        .json(&ViewsPublish {
+            user_id,
+            view: View {
+                ty: "home".into(),
+                blocks: vec![Block {
+                    ty: "section".into(),
+                    text: Some(Text {
+                        ty: "mrkdwn".into(),
+                        text: "Hello, I'm Yozuk.".into(),
+                    }),
+                }],
+            },
+        })
+        .send()
+        .await?;
+    Ok(())
 }
 
 async fn handle_request(

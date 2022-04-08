@@ -1,3 +1,4 @@
+use super::block::*;
 use serde_derive::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -11,4 +12,10 @@ pub struct PostMessage {
     pub text: Option<String>,
     pub thread_ts: Option<String>,
     pub reply_broadcast: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ViewsPublish {
+    pub user_id: String,
+    pub view: View,
 }
