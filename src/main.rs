@@ -1,14 +1,17 @@
 use anyhow::Result;
+use clap::Parser;
 use reqwest::header;
 use std::convert::Infallible;
-use std::env;
+use std::net::SocketAddrV4;
 use std::sync::Arc;
 use warp::Filter;
 use yozuk::{ModelSet, Yozuk, YozukError};
 
+mod args;
 mod event;
 mod message;
 
+use args::*;
 use event::*;
 use message::*;
 
@@ -17,10 +20,10 @@ const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let args = Args::try_parse()?;
+
     let mut headers = header::HeaderMap::new();
-    let mut auth_value =
-        header::HeaderValue::from_str(&format!("Bearer {}", env::var("SLACK_TOKEN").unwrap()))
-            .unwrap();
+    let mut auth_value = header::HeaderValue::from_str(&format!("Bearer {}", args.token)).unwrap();
     auth_value.set_sensitive(true);
     headers.insert(header::AUTHORIZATION, auth_value);
 
@@ -42,7 +45,9 @@ async fn main() -> Result<()> {
         handle_message(event, yozuk.clone(), client.clone(), identity.clone())
     });
 
-    warp::serve(route).run(([127, 0, 0, 1], 8080)).await;
+    warp::serve(route)
+        .run(SocketAddrV4::new(args.addr, args.port))
+        .await;
 
     Ok(())
 }

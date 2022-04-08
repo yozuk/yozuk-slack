@@ -13,3 +13,4 @@ yozuk = "0.5.0"
 yozuk-bundle = "0.5.0"
 yozuk-sdk = "0.2.0"
 anyhow = "1.0.56"
+clap = { version = "3.1.8", features = ["env"] }

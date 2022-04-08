@@ -3028,6 +3028,7 @@ name = "yozuk-slack"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 3.1.8",
  "reqwest",
  "serde",
  "serde_derive",
