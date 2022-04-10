@@ -6,11 +6,11 @@ edition = "2021"
 [dependencies]
 serde = "1.0.136"
 serde_derive = "1.0.136"
-tokio = { version = "1.17.0", features = ["rt", "macros"] }
-reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros"] }
+reqwest = { version = "0.11.10", features = ["json"] }
 warp = "0.3.2"
-yozuk = "0.5.0"
-yozuk-bundle = "0.5.0"
-yozuk-sdk = "0.2.0"
+yozuk = "0.6.0"
+yozuk-bundle = "0.6.0"
+yozuk-sdk = "0.3.0"
 anyhow = "1.0.56"
 clap = { version = "3.1.8", features = ["env"] }
