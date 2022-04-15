@@ -124,6 +124,16 @@ async fn handle_request(
     let output = match result {
         Ok(output) => output,
         Err(YozukError::UnintelligibleRequest { .. }) => {
+            let massage = PostMessage {
+                channel: channel.clone(),
+                text: Some("Sorry, I can't understand your request.".into()),
+                ..Default::default()
+            };
+            client
+                .post(API_URL_POST_MESSAGE)
+                .json(&massage)
+                .send()
+                .await?;
             return Ok(());
         }
         Err(YozukError::CommandError { mut errors }) => errors.pop().unwrap(),
@@ -143,7 +153,7 @@ async fn handle_request(
                     ty: "section".into(),
                     text: Some(Text {
                         ty: "mrkdwn".into(),
-                        text: format!("```\n{}\n```", section.as_utf8()),
+                        text: section.as_utf8().into(),
                     }),
                 }]),
                 ..Default::default()
