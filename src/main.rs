@@ -1,9 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
+use futures_util::StreamExt;
+use mediatype::MediaTypeBuf;
 use reqwest::header;
 use std::convert::Infallible;
 use std::net::SocketAddrV4;
+use std::str::FromStr;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
+use tokio::io::AsyncWriteExt;
 use warp::Filter;
 use yozuk::{ModelSet, Yozuk, YozukError};
 use yozuk_sdk::prelude::*;
@@ -65,13 +70,13 @@ async fn handle_message(
     match event {
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
-                handle_request(msg.text, msg.channel, zuk, client, identity)
+                handle_request(msg.text, msg.channel, &msg.files, zuk, client, identity)
                     .await
                     .unwrap();
             }
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
-                    handle_request(msg.text, msg.channel, zuk, client, identity)
+                    handle_request(msg.text, msg.channel, &msg.files, zuk, client, identity)
                         .await
                         .unwrap();
                 }
@@ -109,17 +114,19 @@ async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
 async fn handle_request(
     text: String,
     channel: String,
+    files: &[File],
     zuk: Arc<Yozuk>,
     client: reqwest::Client,
     identity: Identity,
 ) -> Result<()> {
     let mention = format!("<@{}>", identity.user_id);
     let text = text.replace(&mention, "");
+    let mut streams = futures_util::future::try_join_all(files.iter().map(file_stream)).await?;
 
     let tokens = Yozuk::parse_tokens(&text);
     let result = zuk
-        .get_commands(&tokens, &[])
-        .and_then(|commands| zuk.run_commands(commands, &mut [], &Default::default()));
+        .get_commands(&tokens, &streams)
+        .and_then(|commands| zuk.run_commands(commands, &mut streams, &Default::default()));
 
     let output = match result {
         Ok(output) => output,
@@ -173,4 +180,20 @@ fn handle_url_verification(verification: UrlVerification) -> warp::reply::Json {
     warp::reply::json(&UrlVerificationReply {
         challenge: verification.challenge,
     })
+}
+
+async fn file_stream(file: &File) -> anyhow::Result<InputStream> {
+    let tmpfile = NamedTempFile::new()?;
+    let filepath = tmpfile.into_temp_path();
+    let mut tmpfile = tokio::fs::File::create(&filepath).await?;
+    let mut stream = reqwest::get(&file.url_private_download)
+        .await?
+        .bytes_stream();
+    while let Some(data) = stream.next().await {
+        tmpfile.write(&data?).await?;
+    }
+    Ok(InputStream::new(
+        std::fs::File::open(filepath)?,
+        MediaTypeBuf::from_str(&file.mimetype).unwrap(),
+    ))
 }

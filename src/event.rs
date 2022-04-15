@@ -32,6 +32,8 @@ pub struct AppMention {
     pub text: String,
     pub user: String,
     pub ts: String,
+    #[serde(default)]
+    pub files: Vec<File>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +43,16 @@ pub struct Message {
     pub user: String,
     pub channel_type: String,
     pub ts: String,
+    #[serde(default)]
+    pub files: Vec<File>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct File {
+    pub name: String,
+    pub title: String,
+    pub mimetype: String,
+    pub url_private_download: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
