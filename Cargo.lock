@@ -690,6 +690,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gh-emoji"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6af39cf9a679d7195b3370f5454381ba49c4791bc7ce3ae2a7bf1a2a89c7adf"
+dependencies = [
+ "phf 0.10.1",
+ "regex",
+]
+
+[[package]]
 name = "h2"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2780,6 +2790,7 @@ dependencies = [
  "anyhow",
  "clap",
  "futures-util",
+ "gh-emoji",
  "mediatype",
  "reqwest",
  "serde",

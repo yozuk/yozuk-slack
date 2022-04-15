@@ -115,6 +115,8 @@ async fn handle_request(
 ) -> Result<()> {
     let mention = format!("<@{}>", identity.user_id);
     let text = msg.text.replace(&mention, "");
+    let text = gh_emoji::Replacer::new().replace_all(&text);
+
     let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
     let tokens = Yozuk::parse_tokens(&text);
