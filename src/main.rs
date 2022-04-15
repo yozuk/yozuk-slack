@@ -119,7 +119,7 @@ async fn handle_request(
     let tokens = Yozuk::parse_tokens(&text);
     let result = zuk
         .get_commands(&tokens, &[])
-        .and_then(|commands| zuk.run_commands(commands, &mut []));
+        .and_then(|commands| zuk.run_commands(commands, &mut [], &Default::default()));
 
     let output = match result {
         Ok(output) => output,
