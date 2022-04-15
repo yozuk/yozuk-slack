@@ -70,15 +70,11 @@ async fn handle_message(
     match event {
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
-                handle_request(msg.text, msg.channel, &msg.files, zuk, client, identity)
-                    .await
-                    .unwrap();
+                handle_request(msg, zuk, client, identity).await.unwrap();
             }
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
-                    handle_request(msg.text, msg.channel, &msg.files, zuk, client, identity)
-                        .await
-                        .unwrap();
+                    handle_request(msg, zuk, client, identity).await.unwrap();
                 }
             }
             MessageEvent::AppHomeOpened(event) => {
@@ -112,16 +108,14 @@ async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
 }
 
 async fn handle_request(
-    text: String,
-    channel: String,
-    files: &[File],
+    msg: Message,
     zuk: Arc<Yozuk>,
     client: reqwest::Client,
     identity: Identity,
 ) -> Result<()> {
     let mention = format!("<@{}>", identity.user_id);
-    let text = text.replace(&mention, "");
-    let mut streams = futures_util::future::try_join_all(files.iter().map(file_stream)).await?;
+    let text = msg.text.replace(&mention, "");
+    let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
     let tokens = Yozuk::parse_tokens(&text);
     let result = zuk
@@ -132,7 +126,7 @@ async fn handle_request(
         Ok(output) => output,
         Err(YozukError::UnintelligibleRequest { .. }) => {
             let massage = PostMessage {
-                channel: channel.clone(),
+                channel: msg.channel.clone(),
                 text: Some("Sorry, I can't understand your request.".into()),
                 ..Default::default()
             };
@@ -149,13 +143,13 @@ async fn handle_request(
     for section in output.sections {
         let massage = if section.kind == SectionKind::Comment {
             PostMessage {
-                channel: channel.clone(),
+                channel: msg.channel.clone(),
                 text: Some(section.as_utf8().into()),
                 ..Default::default()
             }
         } else {
             PostMessage {
-                channel: channel.clone(),
+                channel: msg.channel.clone(),
                 blocks: Some(vec![Block {
                     ty: "section".into(),
                     text: Some(Text {

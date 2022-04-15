@@ -16,7 +16,7 @@ pub struct UrlVerification {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MessageEvent {
-    AppMention(AppMention),
+    AppMention(Message),
     Message(Message),
     AppHomeOpened(AppHomeOpened),
 }
@@ -27,21 +27,10 @@ pub struct EventCallback {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AppMention {
-    pub channel: String,
-    pub text: String,
-    pub user: String,
-    pub ts: String,
-    #[serde(default)]
-    pub files: Vec<File>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct Message {
     pub channel: String,
     pub text: String,
     pub user: String,
-    pub channel_type: String,
     pub ts: String,
     #[serde(default)]
     pub files: Vec<File>,
