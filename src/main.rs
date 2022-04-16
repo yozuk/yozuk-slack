@@ -18,15 +18,18 @@ mod args;
 mod block;
 mod event;
 mod message;
+mod user;
 
 use args::*;
 use block::*;
 use event::*;
 use message::*;
+use user::*;
 
 const API_URL_AUTH_TEST: &str = "https://slack.com/api/auth.test";
 const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
 const API_URL_VIEWS_PUBLISH: &str = "https://slack.com/api/views.publish";
+const API_URL_USERS_INFO: &str = "https://slack.com/api/users.info";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -109,6 +112,19 @@ async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
 }
 
 async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) -> Result<()> {
+    let user = client
+        .get(API_URL_USERS_INFO)
+        .query(&[("user", msg.user.as_str()), ("include_locale", "true")])
+        .send()
+        .await?
+        .json::<UserResponse>()
+        .await
+        .map(|res| res.user)
+        .unwrap_or_else(|_| User {
+            id: msg.user.clone(),
+            ..Default::default()
+        });
+
     let text = regex_replace_all!(
         r#"<@\w+>"#i,
         & msg.text,
@@ -125,14 +141,17 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
         |_, text| format!("{}", text),
     );
     let text = gh_emoji::Replacer::new().replace_all(&text);
-    println!("{:?}", text);
 
     let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
     let tokens = Yozuk::parse_tokens(&text);
+    let locale = Locale {
+        timezone: user.tz,
+        ..Default::default()
+    };
     let result = zuk
         .get_commands(&tokens, &streams)
-        .and_then(|commands| zuk.run_commands(commands, &mut streams, &Default::default()));
+        .and_then(|commands| zuk.run_commands(commands, &mut streams, &locale));
 
     let output = match result {
         Ok(output) => output,

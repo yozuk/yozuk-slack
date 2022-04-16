@@ -44,11 +44,6 @@ pub struct File {
     pub url_private_download: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Identity {
-    pub user_id: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct AppHomeOpened {
     pub user: String,
