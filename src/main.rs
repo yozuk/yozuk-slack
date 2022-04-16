@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use futures_util::StreamExt;
+use lazy_regex::regex_replace_all;
 use mediatype::MediaTypeBuf;
 use reqwest::header;
 use std::convert::Infallible;
@@ -70,11 +71,11 @@ async fn handle_message(
     match event {
         Event::EventCallback(cb) => match cb.event {
             MessageEvent::AppMention(msg) => {
-                handle_request(msg, zuk, client, identity).await.unwrap();
+                handle_request(msg, zuk, client).await.unwrap();
             }
             MessageEvent::Message(msg) => {
                 if msg.user != identity.user_id {
-                    handle_request(msg, zuk, client, identity).await.unwrap();
+                    handle_request(msg, zuk, client).await.unwrap();
                 }
             }
             MessageEvent::AppHomeOpened(event) => {
@@ -107,15 +108,24 @@ async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
     Ok(())
 }
 
-async fn handle_request(
-    msg: Message,
-    zuk: Arc<Yozuk>,
-    client: reqwest::Client,
-    identity: Identity,
-) -> Result<()> {
-    let mention = format!("<@{}>", identity.user_id);
-    let text = msg.text.replace(&mention, "");
+async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) -> Result<()> {
+    let text = regex_replace_all!(
+        r#"<@\w+>"#i,
+        & msg.text,
+        |_| String::new(),
+    );
+    let text = regex_replace_all!(
+        r#"<[^|]+\|([^>]+)>"#i,
+        &text,
+        |_, text| format!("{}", text),
+    );
+    let text = regex_replace_all!(
+        r#"<([^>]+)>"#i,
+        &text,
+        |_, text| format!("{}", text),
+    );
     let text = gh_emoji::Replacer::new().replace_all(&text);
+    println!("{:?}", text);
 
     let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
