@@ -32,6 +32,7 @@ const API_URL_AUTH_TEST: &str = "https://slack.com/api/auth.test";
 const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
 const API_URL_VIEWS_PUBLISH: &str = "https://slack.com/api/views.publish";
 const API_URL_USERS_INFO: &str = "https://slack.com/api/users.info";
+const API_URL_POST_EPHEMERAL: &str = "https://slack.com/api/chat.postEphemeral";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -174,7 +175,7 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
     };
 
     for block in output.blocks {
-        let massage = match block {
+        let message = match block {
             Block::Comment(comment) => PostMessage {
                 channel: msg.channel.clone(),
                 text: Some(comment.text),
@@ -198,11 +199,24 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
                     return Ok(());
                 }
             }
+            Block::Spoiler(spoiler) => {
+                let message = PostEphemeral {
+                    channel: msg.channel.clone(),
+                    text: format!("{}: {}", spoiler.title, spoiler.data.unsecure()),
+                    user: user.id,
+                };
+                client
+                    .post(API_URL_POST_MESSAGE)
+                    .json(&message)
+                    .send()
+                    .await?;
+                return Ok(());
+            }
             _ => return Ok(()),
         };
         client
             .post(API_URL_POST_MESSAGE)
-            .json(&massage)
+            .json(&message)
             .send()
             .await?;
     }

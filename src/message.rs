@@ -15,6 +15,13 @@ pub struct PostMessage {
     pub reply_broadcast: bool,
 }
 
+#[derive(Debug, Default, Serialize)]
+pub struct PostEphemeral {
+    pub channel: String,
+    pub text: String,
+    pub user: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ViewsPublish {
     pub user_id: String,
