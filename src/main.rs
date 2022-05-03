@@ -135,12 +135,12 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
     let text = regex_replace_all!(
         r#"<[^|]+\|([^>]+)>"#i,
         &text,
-        |_, text| format!("{}", text),
+        |_, text: &str| text.to_string(),
     );
     let text = regex_replace_all!(
         r#"<([^>]+)>"#i,
         &text,
-        |_, text| format!("{}", text),
+        |_, text: &str| text.to_string(),
     );
     let text = gh_emoji::Replacer::new().replace_all(&text);
 
@@ -182,7 +182,7 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
             },
             Block::Data(data) => {
                 let data = data.data.data().unwrap();
-                if let Ok(text) = str::from_utf8(&data) {
+                if let Ok(text) = str::from_utf8(data) {
                     PostMessage {
                         channel: msg.channel.clone(),
                         blocks: Some(vec![SlackBlock {
@@ -224,7 +224,7 @@ async fn file_stream(file: &File) -> anyhow::Result<InputStream> {
         .await?
         .bytes_stream();
     while let Some(data) = stream.next().await {
-        tmpfile.write(&data?).await?;
+        let _ = tmpfile.write(&data?).await?;
     }
     Ok(InputStream::new(
         std::fs::File::open(filepath)?,
