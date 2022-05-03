@@ -203,16 +203,16 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
                 let message = PostEphemeral {
                     channel: msg.channel.clone(),
                     text: format!("{}: {}", spoiler.title, spoiler.data.unsecure()),
-                    user: user.id,
+                    user: user.id.clone(),
                 };
                 client
-                    .post(API_URL_POST_MESSAGE)
+                    .post(API_URL_POST_EPHEMERAL)
                     .json(&message)
                     .send()
                     .await?;
-                return Ok(());
+                continue;
             }
-            _ => return Ok(()),
+            _ => continue,
         };
         client
             .post(API_URL_POST_MESSAGE)
