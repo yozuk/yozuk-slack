@@ -6,12 +6,14 @@ use mediatype::MediaTypeBuf;
 use reqwest::header;
 use std::convert::Infallible;
 use std::net::SocketAddrV4;
+use std::str;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 use warp::Filter;
-use yozuk::{ModelSet, Yozuk, YozukError};
+use yozuk::Yozuk;
+use yozuk_sdk::model::*;
 use yozuk_sdk::prelude::*;
 
 mod args;
@@ -97,7 +99,7 @@ async fn publish_home(client: reqwest::Client, user_id: String) -> Result<()> {
             user_id,
             view: View {
                 ty: "home".into(),
-                blocks: vec![Block {
+                blocks: vec![SlackBlock {
                     ty: "section".into(),
                     text: Some(Text {
                         ty: "mrkdwn".into(),
@@ -145,51 +147,58 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
     let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
     let tokens = Yozuk::parse_tokens(&text);
-    let locale = Locale {
+    let i18n = I18n {
         timezone: user.tz,
         ..Default::default()
     };
-    let result = zuk
-        .get_commands(&tokens, &streams)
-        .and_then(|commands| zuk.run_commands(commands, &mut streams, &locale));
 
+    let commands = zuk.get_commands(&tokens, &streams);
+    if commands.is_empty() {
+        let massage = PostMessage {
+            channel: msg.channel.clone(),
+            text: Some("Sorry, I can't understand your request.".into()),
+            ..Default::default()
+        };
+        client
+            .post(API_URL_POST_MESSAGE)
+            .json(&massage)
+            .send()
+            .await?;
+        return Ok(());
+    }
+
+    let result = zuk.run_commands(commands, &mut streams, Some(&i18n));
     let output = match result {
         Ok(output) => output,
-        Err(YozukError::UnintelligibleRequest { .. }) => {
-            let massage = PostMessage {
-                channel: msg.channel.clone(),
-                text: Some("Sorry, I can't understand your request.".into()),
-                ..Default::default()
-            };
-            client
-                .post(API_URL_POST_MESSAGE)
-                .json(&massage)
-                .send()
-                .await?;
-            return Ok(());
-        }
-        Err(YozukError::CommandError { mut errors }) => errors.pop().unwrap(),
+        Err(mut errors) => errors.pop().unwrap(),
     };
 
-    for section in output.sections {
-        let massage = if section.kind == SectionKind::Comment {
-            PostMessage {
+    for block in output.blocks {
+        let massage = match block {
+            Block::Comment(comment) => PostMessage {
                 channel: msg.channel.clone(),
-                text: Some(section.as_utf8().into()),
+                text: Some(comment.text),
                 ..Default::default()
+            },
+            Block::Data(data) => {
+                let data = data.data.data().unwrap();
+                if let Ok(text) = str::from_utf8(&data) {
+                    PostMessage {
+                        channel: msg.channel.clone(),
+                        blocks: Some(vec![SlackBlock {
+                            ty: "section".into(),
+                            text: Some(Text {
+                                ty: "mrkdwn".into(),
+                                text: text.into(),
+                            }),
+                        }]),
+                        ..Default::default()
+                    }
+                } else {
+                    return Ok(());
+                }
             }
-        } else {
-            PostMessage {
-                channel: msg.channel.clone(),
-                blocks: Some(vec![Block {
-                    ty: "section".into(),
-                    text: Some(Text {
-                        ty: "mrkdwn".into(),
-                        text: section.as_utf8().into(),
-                    }),
-                }]),
-                ..Default::default()
-            }
+            _ => return Ok(()),
         };
         client
             .post(API_URL_POST_MESSAGE)

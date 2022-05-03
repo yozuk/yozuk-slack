@@ -10,7 +10,7 @@ pub struct UrlVerificationReply {
 pub struct PostMessage {
     pub channel: String,
     pub text: Option<String>,
-    pub blocks: Option<Vec<Block>>,
+    pub blocks: Option<Vec<SlackBlock>>,
     pub thread_ts: Option<String>,
     pub reply_broadcast: bool,
 }

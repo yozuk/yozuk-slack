@@ -5,11 +5,11 @@ pub struct View {
     #[serde(rename = "type")]
     pub ty: String,
 
-    pub blocks: Vec<Block>,
+    pub blocks: Vec<SlackBlock>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct Block {
+pub struct SlackBlock {
     #[serde(rename = "type")]
     pub ty: String,
 

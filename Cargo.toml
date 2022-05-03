@@ -4,18 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = "1.0.136"
-serde_derive = "1.0.136"
-tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros"] }
+serde = "1.0.137"
+serde_derive = "1.0.137"
+tokio = { version = "1.18.1", features = ["rt-multi-thread", "macros"] }
 reqwest = { version = "0.11.10", features = ["json", "stream"] }
 warp = "0.3.2"
-yozuk = "0.7.0"
-yozuk-bundle = "0.7.0"
-yozuk-sdk = "0.4.0"
-anyhow = "1.0.56"
-clap = { version = "3.1.8", features = ["env"] }
+yozuk = "0.12.0"
+yozuk-bundle = "0.12.0"
+yozuk-sdk = "0.12.0"
+anyhow = "1.0.57"
+clap = { version = "3.1.15", features = ["env"] }
 tempfile = "3.3.0"
-mediatype = "0.19.1"
+mediatype = "0.19.2"
 futures-util = "0.3.21"
 gh-emoji = "1.0.6"
 lazy-regex = "2.3.0"
