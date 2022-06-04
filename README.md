@@ -21,6 +21,7 @@ yozuk-slack --addr 127.0.0.1
 
 - `app_mentions:read`
 - `chat:write`
+- `file:write`
 - `im:history`
 
 ### Event Subscriptions

@@ -3,7 +3,7 @@ use clap::Parser;
 use futures_util::StreamExt;
 use lazy_regex::regex_replace_all;
 use mediatype::MediaTypeBuf;
-use reqwest::header;
+use reqwest::{header, multipart};
 use std::convert::Infallible;
 use std::net::SocketAddrV4;
 use std::str;
@@ -32,6 +32,7 @@ const API_URL_POST_MESSAGE: &str = "https://slack.com/api/chat.postMessage";
 const API_URL_VIEWS_PUBLISH: &str = "https://slack.com/api/views.publish";
 const API_URL_USERS_INFO: &str = "https://slack.com/api/users.info";
 const API_URL_POST_EPHEMERAL: &str = "https://slack.com/api/chat.postEphemeral";
+const API_URL_FILES_UPLOAD: &str = "https://slack.com/api/files.upload";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -181,8 +182,7 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
                     ..Default::default()
                 },
                 Block::Data(data) => {
-                    let data = &data.data;
-                    if let Ok(text) = str::from_utf8(data) {
+                    if let Ok(text) = str::from_utf8(&data.data) {
                         PostMessage {
                             channel: msg.channel.clone(),
                             blocks: Some(vec![SlackBlock {
@@ -195,7 +195,18 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
                             ..Default::default()
                         }
                     } else {
-                        return Ok(());
+                        let file = multipart::Part::bytes(data.data.to_vec())
+                            .file_name(data.file_name)
+                            .mime_str(&data.media_type.to_string())?;
+                        let form = multipart::Form::new()
+                            .part("file", file)
+                            .text("channels", msg.channel.clone());
+                        client
+                            .post(API_URL_FILES_UPLOAD)
+                            .multipart(form)
+                            .send()
+                            .await?;
+                        continue;
                     }
                 }
                 Block::Spoiler(spoiler) => {
