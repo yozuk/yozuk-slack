@@ -13,7 +13,6 @@ use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 use warp::Filter;
 use yozuk::Yozuk;
-use yozuk_sdk::model::*;
 use yozuk_sdk::prelude::*;
 
 mod args;
@@ -47,8 +46,7 @@ async fn main() -> Result<()> {
         .default_headers(headers)
         .build()?;
 
-    let model = ModelSet::from_data(yozuk_bundle::MODEL_DATA).unwrap();
-    let yozuk = Arc::new(Yozuk::builder().build(model));
+    let yozuk = Arc::new(Yozuk::builder().build());
 
     let identity = client
         .post(API_URL_AUTH_TEST)
@@ -147,7 +145,7 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
 
     let mut streams = futures_util::future::try_join_all(msg.files.iter().map(file_stream)).await?;
 
-    let tokens = Yozuk::parse_tokens(&text);
+    let tokens = Tokenizer::new().tokenize(&text);
     let i18n = I18n {
         timezone: user.tz,
         ..Default::default()
@@ -169,56 +167,58 @@ async fn handle_request(msg: Message, zuk: Arc<Yozuk>, client: reqwest::Client) 
     }
 
     let result = zuk.run_commands(commands, &mut streams, Some(&i18n));
-    let output = match result {
-        Ok(output) => output,
-        Err(mut errors) => errors.pop().unwrap(),
+    let outputs = match result {
+        Ok(outputs) => outputs,
+        Err(outputs) => outputs,
     };
 
-    for block in output.blocks {
-        let message = match block {
-            Block::Comment(comment) => PostMessage {
-                channel: msg.channel.clone(),
-                text: Some(comment.text),
-                ..Default::default()
-            },
-            Block::Data(data) => {
-                let data = data.data.data().unwrap();
-                if let Ok(text) = str::from_utf8(data) {
-                    PostMessage {
-                        channel: msg.channel.clone(),
-                        blocks: Some(vec![SlackBlock {
-                            ty: "section".into(),
-                            text: Some(Text {
-                                ty: "mrkdwn".into(),
-                                text: text.into(),
-                            }),
-                        }]),
-                        ..Default::default()
-                    }
-                } else {
-                    return Ok(());
-                }
-            }
-            Block::Spoiler(spoiler) => {
-                let message = PostEphemeral {
+    for output in outputs {
+        for block in output.blocks {
+            let message = match block {
+                Block::Comment(comment) => PostMessage {
                     channel: msg.channel.clone(),
-                    text: format!("{}: {}", spoiler.title, spoiler.data.unsecure()),
-                    user: user.id.clone(),
-                };
-                client
-                    .post(API_URL_POST_EPHEMERAL)
-                    .json(&message)
-                    .send()
-                    .await?;
-                continue;
-            }
-            _ => continue,
-        };
-        client
-            .post(API_URL_POST_MESSAGE)
-            .json(&message)
-            .send()
-            .await?;
+                    text: Some(comment.text),
+                    ..Default::default()
+                },
+                Block::Data(data) => {
+                    let data = &data.data;
+                    if let Ok(text) = str::from_utf8(data) {
+                        PostMessage {
+                            channel: msg.channel.clone(),
+                            blocks: Some(vec![SlackBlock {
+                                ty: "section".into(),
+                                text: Some(Text {
+                                    ty: "mrkdwn".into(),
+                                    text: text.into(),
+                                }),
+                            }]),
+                            ..Default::default()
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                }
+                Block::Spoiler(spoiler) => {
+                    let message = PostEphemeral {
+                        channel: msg.channel.clone(),
+                        text: format!("{}: {}", spoiler.title, spoiler.data.unsecure()),
+                        user: user.id.clone(),
+                    };
+                    client
+                        .post(API_URL_POST_EPHEMERAL)
+                        .json(&message)
+                        .send()
+                        .await?;
+                    continue;
+                }
+                _ => continue,
+            };
+            client
+                .post(API_URL_POST_MESSAGE)
+                .json(&message)
+                .send()
+                .await?;
+        }
     }
 
     Ok(())
