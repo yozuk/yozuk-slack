@@ -10,6 +10,6 @@ pub struct Args {
     #[clap(long, env("PORT"))]
     pub port: u16,
 
-    #[clap(long, env("SLACK_TOKEN"))]
+    #[clap(long, env("SLACK_TOKEN"), hide_env_values = true)]
     pub token: String,
 }
